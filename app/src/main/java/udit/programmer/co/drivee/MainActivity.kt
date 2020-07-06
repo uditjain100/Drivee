@@ -30,7 +30,7 @@ class MainActivity : AppCompatActivity() {
             showSignInOptions()
         }
 
-        register_btn.setOnClickListener {
+        register_button.setOnClickListener {
             startActivity(Intent(this, RegisterActivity::class.java))
         }
 
