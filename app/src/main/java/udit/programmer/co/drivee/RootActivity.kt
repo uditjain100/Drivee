@@ -7,6 +7,10 @@ import android.widget.ImageView
 import android.widget.Toast
 import androidx.navigation.findNavController
 import androidx.navigation.ui.setupWithNavController
+import com.firebase.geofire.GeoFire
+import com.firebase.geofire.GeoLocation
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.*
 import com.mapbox.android.core.location.*
 import com.mapbox.android.core.permissions.PermissionsListener
 import com.mapbox.android.core.permissions.PermissionsManager
@@ -32,21 +36,9 @@ class RootActivity : AppCompatActivity(), OnMapReadyCallback, PermissionsListene
 
     private lateinit var mapView: MapView
     var mapboxMap: MapboxMap? = null
-    private lateinit var home: CarmenFeature
-    private lateinit var work: CarmenFeature
-    private val geojsonSourceLayerId = "geojsonSourceLayerId"
-    private val symbolIconId = "symbolIconId"
-    private val REQUEST_CODE_AUTOCOMPLETE = 1
-
-    private val DROPPED_MARKER_LAYER_ID = "DROPPED_MARKER_LAYER_ID"
-    private var hoveringMarker: ImageView? = null
-    private var droppedMarkerLayer: Layer? = null
 
     var currentLat = 0.0
     var currentLng = 0.0
-
-    var lat: Double = 0.0
-    var lng: Double = 0.0
 
     private lateinit var permissionsManager: PermissionsManager
 
@@ -56,6 +48,18 @@ class RootActivity : AppCompatActivity(), OnMapReadyCallback, PermissionsListene
 
     private lateinit var request: LocationEngineRequest
     private var callback = SearchPickActivityLocationCallback(this)
+
+    lateinit var geoFire: GeoFire
+    private lateinit var databaseReference: DatabaseReference
+    lateinit var onlineReference: DatabaseReference
+
+    var onlineValueEventListener = object : ValueEventListener {
+        override fun onCancelled(error: DatabaseError) {}
+        override fun onDataChange(snapshot: DataSnapshot) {
+            if (snapshot.exists())
+                onlineReference.onDisconnect().removeValue()
+        }
+    }
 
     @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -69,6 +73,13 @@ class RootActivity : AppCompatActivity(), OnMapReadyCallback, PermissionsListene
         mapView = findViewById(R.id.mapView_000)
         mapView.onCreate(savedInstanceState)
         mapView.getMapAsync(this)
+
+        databaseReference = FirebaseDatabase.getInstance().getReference("DRIVER_LOCATION_REFERENCE")
+            .child(FirebaseAuth.getInstance().currentUser!!.uid)
+        onlineReference = FirebaseDatabase.getInstance().getReference("DRIVER_LOCATION_REFERENCE")
+        geoFire = GeoFire(databaseReference)
+
+        registerOnlineUser()
 
         fab_navigate_pick_btn.setOnClickListener {
             locationEngine!!.requestLocationUpdates(request, callback, mainLooper)
@@ -124,7 +135,12 @@ class RootActivity : AppCompatActivity(), OnMapReadyCallback, PermissionsListene
 
     override fun onResume() {
         super.onResume()
+        registerOnlineUser()
         mapView.onResume()
+    }
+
+    private fun registerOnlineUser() {
+        onlineReference.addValueEventListener(onlineValueEventListener)
     }
 
     @SuppressLint("MissingPermission")
@@ -152,6 +168,7 @@ class RootActivity : AppCompatActivity(), OnMapReadyCallback, PermissionsListene
 
     override fun onDestroy() {
         super.onDestroy()
+        geoFire.removeLocation(FirebaseAuth.getInstance().currentUser!!.uid)
         locationEngine!!.removeLocationUpdates(callback)
         mapView.onDestroy()
     }
@@ -191,6 +208,16 @@ class SearchPickActivityLocationCallback(activity: RootActivity?) :
                             .build()
                     ), 4000
                 )
+                activity.geoFire.setLocation(
+                    FirebaseAuth.getInstance().currentUser!!.uid,
+                    GeoLocation(activity.currentLat, activity.currentLng)
+                ) { _, error ->
+                    if (error != null) {
+                        Toast.makeText(activity, error.message, Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(activity, "You are Online", Toast.LENGTH_LONG).show()
+                    }
+                }
             }
         }
     }
