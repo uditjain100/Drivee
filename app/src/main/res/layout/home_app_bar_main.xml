@@ -6,4 +6,27 @@
     android:layout_height="match_parent"
     tools:context=".RootActivity">
 
+    <include
+        layout="@layout/home_content_main"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/home_toolbar_layout"
+        android:layout_margin="10dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/home_toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/DodgerBlue"
+            android:theme="@style/AppTheme"
+            app:title="PG :)"
+            app:titleTextColor="@color/Black" />
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -1,14 +1,24 @@
 package udit.programmer.co.drivee
 
 import android.annotation.SuppressLint
+import android.content.DialogInterface
+import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.view.Menu
+import android.view.MenuItem
 import android.widget.ImageView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import androidx.navigation.Navigation
 import androidx.navigation.findNavController
+import androidx.navigation.ui.AppBarConfiguration
+import androidx.navigation.ui.navigateUp
+import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.navigation.ui.setupWithNavController
 import com.firebase.geofire.GeoFire
 import com.firebase.geofire.GeoLocation
+import com.google.android.material.navigation.NavigationView
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 import com.mapbox.android.core.location.*
@@ -28,11 +38,17 @@ import com.mapbox.mapboxsdk.maps.Style
 import com.mapbox.mapboxsdk.plugins.traffic.TrafficPlugin
 import com.mapbox.mapboxsdk.style.layers.Layer
 import kotlinx.android.synthetic.main.activity_root.*
+import kotlinx.android.synthetic.main.home_app_bar_main.*
 import kotlinx.android.synthetic.main.home_content_main.*
+import kotlinx.android.synthetic.main.nav_header_layout.*
+import udit.programmer.co.drivee.Models.Customer
 import java.lang.Exception
 import java.lang.ref.WeakReference
 
-class RootActivity : AppCompatActivity(), OnMapReadyCallback, PermissionsListener {
+class RootActivity : AppCompatActivity(), OnMapReadyCallback, PermissionsListener,
+    NavigationView.OnNavigationItemSelectedListener {
+
+    private lateinit var appBarConfiguration : AppBarConfiguration
 
     private lateinit var mapView: MapView
     var mapboxMap: MapboxMap? = null
@@ -66,9 +82,17 @@ class RootActivity : AppCompatActivity(), OnMapReadyCallback, PermissionsListene
         super.onCreate(savedInstanceState)
         Mapbox.getInstance(this, getString(R.string.mapbox_access_token))
         setContentView(R.layout.activity_root)
+        setSupportActionBar(home_toolbar)
+
+        appBarConfiguration = AppBarConfiguration(setOf(
+            R.id.nav_Home , R.id.nav_sign_out
+        ), root_layout)
 
         val navController = findNavController(R.id.nav_host_fragment)
+        setupActionBarWithNavController(navController, appBarConfiguration)
         home_nav_view.setupWithNavController(navController)
+
+//        retrievingWork()
 
         mapView = findViewById(R.id.mapView_000)
         mapView.onCreate(savedInstanceState)
@@ -79,12 +103,27 @@ class RootActivity : AppCompatActivity(), OnMapReadyCallback, PermissionsListene
         onlineReference = FirebaseDatabase.getInstance().getReference("DRIVER_LOCATION_REFERENCE")
         geoFire = GeoFire(databaseReference)
 
-        registerOnlineUser()
+        onlineReference.addValueEventListener(onlineValueEventListener)
 
         fab_navigate_pick_btn.setOnClickListener {
             locationEngine!!.requestLocationUpdates(request, callback, mainLooper)
         }
 
+    }
+
+    private fun retrievingWork() {
+        FirebaseDatabase.getInstance()
+            .getReference(FirebaseAuth.getInstance().currentUser!!.phoneNumber.toString())
+            .addValueEventListener(object : ValueEventListener {
+                override fun onCancelled(error: DatabaseError) {}
+
+                @SuppressLint("SetTextI18n")
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val customer = snapshot.getValue(Customer::class.java)
+                    nav_customer_name.text = customer!!.firstName + " " + customer.lastName
+                    nav_customer_number.text = customer.number
+                }
+            })
     }
 
     override fun onMapReady(mapboxMap: MapboxMap) {
@@ -135,12 +174,8 @@ class RootActivity : AppCompatActivity(), OnMapReadyCallback, PermissionsListene
 
     override fun onResume() {
         super.onResume()
-        registerOnlineUser()
-        mapView.onResume()
-    }
-
-    private fun registerOnlineUser() {
         onlineReference.addValueEventListener(onlineValueEventListener)
+        mapView.onResume()
     }
 
     @SuppressLint("MissingPermission")
@@ -178,6 +213,47 @@ class RootActivity : AppCompatActivity(), OnMapReadyCallback, PermissionsListene
         mapView.onSaveInstanceState(outState)
     }
 
+    override fun onNavigationItemSelected(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.nav_sign_out -> {
+                dialogWork()
+            }
+        }
+        return true
+    }
+
+    private fun dialogWork() {
+        AlertDialog.Builder(this).setCancelable(false).setMessage("Finally Signing Out")
+            .setTitle("Sign Out").setPositiveButton(
+                "SIGN OUT"
+            ) { dialog, which ->
+                FirebaseAuth.getInstance().signOut()
+                startActivity(
+                    Intent(
+                        this,
+                        MainActivity::class.java
+                    ).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                )
+                finish()
+            }.show()
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.home_toolbar_menu, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        when(item.itemId){
+            R.id.nav_logout -> { dialogWork() }
+        }
+        return super.onOptionsItemSelected(item)
+    }
+
+    override fun onSupportNavigateUp(): Boolean {
+        val navController = findNavController(R.id.nav_host_fragment)
+        return navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
+    }
 }
 
 class SearchPickActivityLocationCallback(activity: RootActivity?) :

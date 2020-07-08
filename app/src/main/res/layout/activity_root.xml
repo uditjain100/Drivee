@@ -11,7 +11,7 @@
     tools:openDrawer="start">
 
     <include
-        layout="@layout/home_content_main"
+        layout="@layout/home_app_bar_main"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
